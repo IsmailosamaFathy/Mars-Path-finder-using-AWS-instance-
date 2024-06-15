@@ -1,0 +1,136 @@
+#include <Arduino.h>
+#include "motorDriver.h"
+#include "sensorDriver.h"
+#include "collision.h"
+#include <iostream>
+#include <stdio.h>
+
+void taskOne( void * parameter);
+void taskTwo( void * parameter);
+#define LED_BOARD 2 //change here the pin of the board to V2
+
+mclass m;
+Collision collisionSensor;
+int16_t seg_distance;
+
+void setup(){
+  pinMode(LED_BOARD, OUTPUT);
+  Serial.begin(9600);
+  delay(1000);
+
+  
+  sclass sensorobject;
+
+  
+  m.SETUP();
+  sensorobject.SETUP();
+
+  m.set_speed(MotorA,Forward,255);
+  m.set_speed(MotorB,Forward,255);
+Serial.println("Failed to initialize collision sensor. Exiting.");
+
+
+
+  if (!collisionSensor.init()) {
+    Serial.println("Failed to initialize collision sensor. Exiting.");
+    while (1);  // Hang in an infinite loop if initialization fails
+  }
+
+
+  xTaskCreate(
+                    taskOne,          /* Task function. */
+                    "TaskOne",        /* String with name of task. */
+                    8192,              /* Stack size in bytes. */
+                    NULL,             /* Parameter passed as input of the task */
+                    1,                /* Priority of the task. */
+                    NULL);            /* Task handle. */
+
+  // xTaskCreate(
+  //                   taskTwo,          /* Task function. */
+  //                   "TaskTwo",        /* String with name of task. */
+  //                   2048,              /* Stack size in bytes. */
+  //                   NULL,             /* Parameter passed as input of the task */
+  //                   1,                /* Priority of the task. */
+  //                   NULL);            /* Task handle. */
+}
+
+void loop(){
+   // Collision collisionSensor;
+
+  int16_t *resultArray = sensorobject.reading();
+   if (resultArray[0]<110 || resultArray[1]<140 ) {
+    if (resultArray[0]>-10 || resultArray[1]>-10 ) {
+      m.set_speed(MotorA,Backward,190);
+      m.set_speed(MotorB,Forward,190); 
+      delay(10); 
+     } }
+
+  else if (resultArray[1]<110 || resultArray[2]<140) {
+    if (resultArray[1]>-10 || resultArray[2]>-10 ) {
+      m.set_speed(MotorB,Backward,190);
+      m.set_speed(MotorA,Forward,190); 
+      delay(10); 
+     } }
+  
+  else  {
+      m.set_speed(MotorA,Forward,255);
+      m.set_speed(MotorB,Forward,255);  
+     }
+// m.set_speed(MotorB,Backward,0);
+// m.set_speed(MotorA,Forward,0); 
+
+// Call the warning function to get segment information
+  Collision::segments segments = collisionSensor.warning();
+  // Print the measured values for left, center, and right segments
+  Serial.print("L : ");
+  Serial.print(segments.l);
+   Serial.print("\t Left : ");
+   Serial.print(resultArray[0]);
+  Serial.print("\t C : ");
+  Serial.print(segments.c);
+   Serial.print("\t Center : ");
+  Serial.print(resultArray[1]);
+  Serial.print("\t R : ");
+  Serial.print(segments.r);
+  Serial.print("\t Right : ");
+  Serial.println(resultArray[2]);
+
+  // Delay before the next iteration
+  // initally 1000 then 100
+  delay(10);  // Adjust the delay as needed
+}
+
+void taskOne( void * parameter )
+{
+    //example of a task that executes for some time and then is deleted
+    for( int i = 0; i < 15; i++ )
+    {
+      //Serial.println("Hello from task 1");
+      
+      //Switch on the LED
+      digitalWrite(LED_BOARD, HIGH); 
+      // Pause the task for 1000ms
+      //delay(1000); //This delay doesn't give a chance to the other tasks to execute
+      //Serial.println("Hello from task 1 before delay");
+      vTaskDelay(1000 / portTICK_PERIOD_MS); //this pauses the task, so others can execute
+      // Switch off the LED
+      digitalWrite(LED_BOARD, LOW);
+      // Pause the task again for 500ms
+      vTaskDelay(500 / portTICK_PERIOD_MS);
+    }
+    Serial.println("Ending task: 1");
+    vTaskDelete( NULL );
+}
+ 
+void taskTwo( void * parameter)
+{
+    //create an endless loop so the task executes forever
+    for( ;; )
+    {
+        Serial.println("Hello from task: 2");
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+    }
+    Serial.println("Ending task 2"); //should not reach this point but in case...
+    vTaskDelete( NULL );
+}
+
